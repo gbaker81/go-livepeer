@@ -7,7 +7,9 @@
 #### General
 
 #### Broadcaster
+
 - \#1946 Send transcoding stream health events to a metadata queue (@victorges)
+- \#1874 Fetch as many orchestrators as possible during discovery before a shorter timeout (@kyriediculous)
 
 #### Orchestrator
 
