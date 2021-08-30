@@ -18,8 +18,18 @@ type CapabilityComparator interface {
 	LegacyOnly() bool
 }
 
+const (
+	Score_Untrusted = 0
+	Score_Trusted = 1
+)
+
+type OrchestratorLocalInfo struct {
+	URL   *url.URL
+	Score uint
+}
+
 type OrchestratorPool interface {
-	GetURLs() []*url.URL
+	GetInfos() []OrchestratorLocalInfo
 	GetOrchestrators(int, Suspender, CapabilityComparator) ([]*net.OrchestratorInfo, error)
 	Size() int
 }

@@ -85,9 +85,13 @@ func (dbo *DBOrchestratorPoolCache) getURLs() ([]*url.URL, error) {
 	return uris, nil
 }
 
-func (dbo *DBOrchestratorPoolCache) GetURLs() []*url.URL {
+func (dbo *DBOrchestratorPoolCache) GetInfos() []common.OrchestratorLocalInfo {
 	uris, _ := dbo.getURLs()
-	return uris
+	infos := make([]common.OrchestratorLocalInfo, 0, len(uris))
+	for _, uri := range uris {
+		infos = append(infos, common.OrchestratorLocalInfo{URL: uri, Score: common.Score_Untrusted})
+	}
+	return infos
 }
 
 func (dbo *DBOrchestratorPoolCache) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator) ([]*net.OrchestratorInfo, error) {
@@ -132,7 +136,7 @@ func (dbo *DBOrchestratorPoolCache) GetOrchestrators(numOrchestrators int, suspe
 		return true
 	}
 
-	orchPool := NewOrchestratorPoolWithPred(dbo.bcast, uris, pred)
+	orchPool := NewOrchestratorPoolWithPred(dbo.bcast, uris, pred, common.Score_Untrusted)
 	orchInfos, err := orchPool.GetOrchestrators(numOrchestrators, suspender, caps)
 	if err != nil || len(orchInfos) <= 0 {
 		return nil, err

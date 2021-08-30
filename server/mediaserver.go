@@ -1530,9 +1530,9 @@ func (s *LivepeerServer) GetNodeStatus() *net.NodeStatus {
 		res.RegisteredTranscoders = s.LivepeerNode.TranscoderManager.RegisteredTranscodersInfo()
 	}
 	if s.LivepeerNode.OrchestratorPool != nil {
-		urls := s.LivepeerNode.OrchestratorPool.GetURLs()
-		for _, url := range urls {
-			res.OrchestratorPool = append(res.OrchestratorPool, url.String())
+		infos := s.LivepeerNode.OrchestratorPool.GetInfos()
+		for _, info := range infos {
+			res.OrchestratorPool = append(res.OrchestratorPool, info.URL.String())
 		}
 	}
 	return res

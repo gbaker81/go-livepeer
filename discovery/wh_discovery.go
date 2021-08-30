@@ -38,11 +38,11 @@ func NewWebhookPool(bcast common.Broadcaster, callback *url.URL) *webhookPool {
 		mu:       &sync.RWMutex{},
 		bcast:    bcast,
 	}
-	go p.getURLs()
+	go p.getInfos()
 	return p
 }
 
-func (w *webhookPool) getURLs() ([]*url.URL, error) {
+func (w *webhookPool) getInfos() ([]common.OrchestratorLocalInfo, error) {
 	w.mu.RLock()
 	lastReq := w.lastRequest
 	pool := w.pool
@@ -50,7 +50,7 @@ func (w *webhookPool) getURLs() ([]*url.URL, error) {
 
 	// retrive addrs from cache if time since lastRequest is less than the refresh interval
 	if time.Since(lastReq) < whRefreshInterval {
-		return pool.GetURLs(), nil
+		return pool.GetInfos(), nil
 	}
 
 	// retrive addrs from webhook if time since lastRequest is more than the refresh interval
@@ -65,15 +65,16 @@ func (w *webhookPool) getURLs() ([]*url.URL, error) {
 		w.lastRequest = time.Now()
 		pool = w.pool // may have been reset since beginning
 		w.mu.Unlock()
-		return pool.GetURLs(), nil
+		return pool.GetInfos(), nil
 	}
 
-	addrs, err := deserializeWebhookJSON(body)
+	infos, err := deserializeWebhookJSON(body)
 	if err != nil {
 		return nil, err
 	}
 
-	pool = NewOrchestratorPool(w.bcast, addrs)
+	// pool = NewOrchestratorPool(w.bcast, addrs)
+	pool = &orchestratorPool{infos: infos, bcast: w.bcast}
 
 	w.mu.Lock()
 	w.responseHash = hash
@@ -81,20 +82,20 @@ func (w *webhookPool) getURLs() ([]*url.URL, error) {
 	w.lastRequest = time.Now()
 	w.mu.Unlock()
 
-	return addrs, nil
+	return infos, nil
 }
 
-func (w *webhookPool) GetURLs() []*url.URL {
-	uris, _ := w.getURLs()
-	return uris
+func (w *webhookPool) GetInfos() []common.OrchestratorLocalInfo {
+	infos, _ := w.getInfos()
+	return infos
 }
 
 func (w *webhookPool) Size() int {
-	return len(w.GetURLs())
+	return len(w.GetInfos())
 }
 
 func (w *webhookPool) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator) ([]*net.OrchestratorInfo, error) {
-	_, err := w.getURLs()
+	_, err := w.getInfos()
 	if err != nil {
 		return nil, err
 	}
@@ -124,21 +125,21 @@ var getURLsfromWebhook = func(cbUrl *url.URL) ([]byte, error) {
 	return body, nil
 }
 
-func deserializeWebhookJSON(body []byte) ([]*url.URL, error) {
+func deserializeWebhookJSON(body []byte) ([]common.OrchestratorLocalInfo, error) {
 	var addrs []webhookResponse
 	if err := json.Unmarshal(body, &addrs); err != nil {
 		glog.Error("Unable to unmarshal JSON ", err)
 		return nil, err
 	}
-	var urls []*url.URL
+	var infos []common.OrchestratorLocalInfo
 	for _, addr := range addrs {
 		uri, err := url.ParseRequestURI(addr.Address)
 		if err != nil {
 			glog.Errorf("Unable to parse address  %s : %s", addr, err)
 			continue
 		}
-		urls = append(urls, uri)
+		infos = append(infos, common.OrchestratorLocalInfo{URL: uri, Score: addr.Score})
 	}
 
-	return urls, nil
+	return infos, nil
 }
