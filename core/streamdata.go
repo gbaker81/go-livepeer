@@ -29,15 +29,16 @@ type DetectionConfig struct {
 }
 
 type StreamParameters struct {
-	ManifestID   ManifestID
-	RtmpKey      string
-	Profiles     []ffmpeg.VideoProfile
-	Resolution   string
-	Format       ffmpeg.Format
-	OS           drivers.OSSession
-	RecordOS     drivers.OSSession
-	Capabilities *Capabilities
-	Detection    DetectionConfig
+	ManifestID       ManifestID
+	RtmpKey          string
+	Profiles         []ffmpeg.VideoProfile
+	Resolution       string
+	Format           ffmpeg.Format
+	OS               drivers.OSSession
+	RecordOS         drivers.OSSession
+	Capabilities     *Capabilities
+	Detection        DetectionConfig
+	VerificationFreq uint
 }
 
 func (s *StreamParameters) StreamID() string {

@@ -127,6 +127,7 @@ type authWebhookResponse struct {
 			Name string `json:"name"`
 		} `json:"sceneClassification"`
 	} `json:"detection"`
+	VerificationFreq uint `json:"verificationFreq"`
 }
 
 func NewLivepeerServer(rtmpAddr string, lpNode *core.LivepeerNode, httpIngest bool, transcodingOptions string) (*LivepeerServer, error) {
@@ -232,6 +233,7 @@ func createRTMPStreamIDHandler(s *LivepeerServer) func(url *url.URL) (strmID str
 		var oss, ross drivers.OSSession
 		profiles := []ffmpeg.VideoProfile{}
 		detectionConfig := core.DetectionConfig{}
+		var VerificationFreq uint
 		if resp, err = authenticateStream(url.String()); err != nil {
 			glog.Errorf("Authentication denied for streamID url=%s err=%v", url.String(), err)
 			return nil
@@ -280,6 +282,7 @@ func createRTMPStreamIDHandler(s *LivepeerServer) func(url *url.URL) (strmID str
 					return nil
 				}
 			}
+			VerificationFreq = resp.VerificationFreq
 		} else {
 			profiles = BroadcastJobVideoProfiles
 		}
@@ -318,10 +321,11 @@ func createRTMPStreamIDHandler(s *LivepeerServer) func(url *url.URL) (strmID str
 			ManifestID: mid,
 			RtmpKey:    key,
 			// HTTP push mutates `profiles` so make a copy of it
-			Profiles:  append([]ffmpeg.VideoProfile(nil), profiles...),
-			OS:        oss,
-			RecordOS:  ross,
-			Detection: detectionConfig,
+			Profiles:         append([]ffmpeg.VideoProfile(nil), profiles...),
+			OS:               oss,
+			RecordOS:         ross,
+			Detection:        detectionConfig,
+			VerificationFreq: VerificationFreq,
 		}
 	}
 }

@@ -35,6 +35,7 @@ const (
 	Capability_GOP
 	Capability_AuthToken
 	Capability_SceneClassification
+	Capability_MPEG7VideoSignature
 )
 
 var capFormatConv = errors.New("capability: unknown format")
@@ -57,6 +58,7 @@ func DefaultCapabilities() []Capability {
 		Capability_ProfileH264ConstrainedHigh,
 		Capability_GOP,
 		Capability_AuthToken,
+		Capability_MPEG7VideoSignature,
 	}
 }
 
@@ -110,6 +112,9 @@ func JobCapabilities(params *StreamParameters) (*Capabilities, error) {
 	// Define any default capabilities (especially ones that may be mandatory)
 	caps[Capability_H264] = true
 	caps[Capability_AuthToken] = true
+	if params.VerificationFreq > 0 {
+		caps[Capability_MPEG7VideoSignature] = true
+	}
 
 	// capabilities based on requested output
 	for _, v := range params.Profiles {
@@ -207,10 +212,10 @@ func CapabilitiesFromNetCapabilities(caps *net.Capabilities) *Capabilities {
 
 func NewCapabilities(caps []Capability, m []Capability) *Capabilities {
 	c := &Capabilities{}
-	if caps != nil && len(caps) > 0 {
+	if len(caps) > 0 {
 		c.bitstring = NewCapabilityString(caps)
 	}
-	if m != nil && len(m) > 0 {
+	if len(m) > 0 {
 		c.mandatories = NewCapabilityString(m)
 	}
 	return c

@@ -19,7 +19,8 @@ import (
 var whRefreshInterval = 1 * time.Minute
 
 type webhookResponse struct {
-	Address string
+	Address string `json:"address,omitempty"`
+	Score   uint   `json:"score,omitempty"`
 }
 
 type webhookPool struct {
