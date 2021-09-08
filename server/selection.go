@@ -16,7 +16,10 @@ type BroadcastSessionsSelector interface {
 	Select() *BroadcastSession
 	Size() int
 	Clear()
+	Remove(session *BroadcastSession) bool
 }
+
+type BroadcastSessionsSelectorFactory func() BroadcastSessionsSelector
 
 type sessHeap []*BroadcastSession
 
@@ -121,6 +124,7 @@ func (s *MinLSSelector) Complete(sess *BroadcastSession) {
 // Select returns the session with the lowest latency score if it is good enough.
 // Otherwise, a session without a latency score yet is returned
 func (s *MinLSSelector) Select() *BroadcastSession {
+	glog.Infof("^^^^^^^^^^^ knwon sess len %d unkwnonb %d", len(*s.knownSessions), len(s.unknownSessions))
 	sess := s.knownSessions.Peek()
 	if sess == nil {
 		return s.selectUnknownSession()
@@ -128,10 +132,22 @@ func (s *MinLSSelector) Select() *BroadcastSession {
 
 	minSess := sess.(*BroadcastSession)
 	if minSess.LatencyScore > s.minLS && len(s.unknownSessions) > 0 {
+		glog.Infof("==> bad score, going for unknown !")
 		return s.selectUnknownSession()
 	}
+	glog.Infof("==> doing pop!")
 
 	return heap.Pop(s.knownSessions).(*BroadcastSession)
+}
+
+func (s *MinLSSelector) Remove(session *BroadcastSession) bool {
+	for i, el := range *s.knownSessions {
+		if el.OrchestratorInfo.Transcoder == session.OrchestratorInfo.Transcoder {
+			heap.Remove(s.knownSessions, i)
+			return true
+		}
+	}
+	return false
 }
 
 // Size returns the number of sessions stored by the selector
@@ -151,11 +167,13 @@ func (s *MinLSSelector) selectUnknownSession() *BroadcastSession {
 	if len(s.unknownSessions) == 0 {
 		return nil
 	}
+	glog.Infof("stake reader is %v", s.stakeRdr != nil)
 
 	if s.stakeRdr == nil {
 		// Sessions are selected based on the order of unknownSessions in off-chain mode
 		sess := s.unknownSessions[0]
 		s.unknownSessions = s.unknownSessions[1:]
+		glog.Infof("== returning sess %+v", sess)
 		return sess
 	}
 
@@ -171,6 +189,7 @@ func (s *MinLSSelector) selectUnknownSession() *BroadcastSession {
 		}
 		addrCount[addr]++
 	}
+	glog.Infof("== addrCount %d: %+v", len(addrCount), addrCount)
 
 	// Fetch stake weights for all addresses
 	// We handle the possibility of missing stake weights for addresses when we run weighted random selection on unknownSessions
@@ -178,6 +197,7 @@ func (s *MinLSSelector) selectUnknownSession() *BroadcastSession {
 	// If we fail to read stake weights of unknownSessions we should not continue with selection
 	if err != nil {
 		glog.Errorf("failed to read stake weights for selection: %v", err)
+		panic("sto")
 		return nil
 	}
 
@@ -197,8 +217,10 @@ func (s *MinLSSelector) selectUnknownSession() *BroadcastSession {
 	// If subtracting the stake weight for the current session from r results in a value <= 0, we select the current session
 	// The greater the stake weight of a session, the more likely that it will be selected because subtracting its stake weight from r
 	// will result in a value <= 0
+	glog.Infof("===> got unknownSessions=%d ", len(s.unknownSessions))
 	for i, sess := range s.unknownSessions {
 		if sess.OrchestratorInfo.GetTicketParams() == nil {
+			panic("fuuu")
 			continue
 		}
 		addr := ethcommon.BytesToAddress(sess.OrchestratorInfo.TicketParams.Recipient)

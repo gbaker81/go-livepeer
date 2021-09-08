@@ -72,13 +72,14 @@ var httpPushResetTimer = func() (context.Context, context.CancelFunc) {
 }
 
 type rtmpConnection struct {
-	mid             core.ManifestID
-	nonce           uint64
-	stream          stream.RTMPVideoStream
-	pl              core.PlaylistManager
-	profile         *ffmpeg.VideoProfile
-	params          *core.StreamParameters
-	sessManager     *BroadcastSessionsManager
+	mid     core.ManifestID
+	nonce   uint64
+	stream  stream.RTMPVideoStream
+	pl      core.PlaylistManager
+	profile *ffmpeg.VideoProfile
+	params  *core.StreamParameters
+	// sessManager     *BroadcastSessionsManager
+	sessManager2    *BroadcastSessionsManager2
 	lastUsed        time.Time
 	sourceBytes     uint64
 	transcodedBytes uint64
@@ -568,15 +569,19 @@ func (s *LivepeerServer) registerConnection(rtmpStrm stream.RTMPVideoStream) (*r
 	if s.LivepeerNode.Eth != nil {
 		stakeRdr = &storeStakeReader{store: s.LivepeerNode.Database}
 	}
+	selFactory := func() BroadcastSessionsSelector {
+		return NewMinLSSelector(stakeRdr, 1.0)
+	}
 	cxn := &rtmpConnection{
-		mid:         mid,
-		nonce:       nonce,
-		stream:      rtmpStrm,
-		pl:          playlist,
-		profile:     &vProfile,
-		params:      params,
-		sessManager: NewSessionManager(s.LivepeerNode, params, NewMinLSSelector(stakeRdr, 1.0)),
-		lastUsed:    time.Now(),
+		mid:     mid,
+		nonce:   nonce,
+		stream:  rtmpStrm,
+		pl:      playlist,
+		profile: &vProfile,
+		params:  params,
+		// sessManager: NewSessionManager(s.LivepeerNode, params, NewMinLSSelector(stakeRdr, 1.0)),
+		sessManager2: NewSessionManager2(s.LivepeerNode, params, selFactory),
+		lastUsed:     time.Now(),
 	}
 
 	s.connectionLock.Lock()
@@ -586,7 +591,7 @@ func (s *LivepeerServer) registerConnection(rtmpStrm stream.RTMPVideoStream) (*r
 	if exists {
 		// We can only have one concurrent stream per ManifestID
 		s.connectionLock.Unlock()
-		cxn.sessManager.cleanup()
+		cxn.sessManager2.cleanup()
 		return oldCxn, errAlreadyExists
 	}
 	s.rtmpConnections[mid] = cxn
@@ -617,7 +622,7 @@ func removeRTMPStream(s *LivepeerServer, extmid core.ManifestID) error {
 		return errUnknownStream
 	}
 	cxn.stream.Close()
-	cxn.sessManager.cleanup()
+	cxn.sessManager2.cleanup()
 	cxn.pl.Cleanup()
 	glog.Infof("Ended stream with manifestID=%s external manifestID=%s", intmid, extmid)
 	delete(s.rtmpConnections, intmid)
@@ -1533,6 +1538,7 @@ func (s *LivepeerServer) GetNodeStatus() *net.NodeStatus {
 		infos := s.LivepeerNode.OrchestratorPool.GetInfos()
 		for _, info := range infos {
 			res.OrchestratorPool = append(res.OrchestratorPool, info.URL.String())
+			res.Scores = append(res.Scores, info.Score)
 		}
 	}
 	return res

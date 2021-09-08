@@ -52,10 +52,20 @@ func (o *orchestratorPool) GetInfos() []common.OrchestratorLocalInfo {
 	return o.infos
 }
 
-func (o *orchestratorPool) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator) ([]*net.OrchestratorInfo, error) {
-	numAvailableOrchs := len(o.infos)
+func (o *orchestratorPool) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator,
+	score uint) ([]*net.OrchestratorInfo, error) {
+
+	linfos := make([]common.OrchestratorLocalInfo, 0, len(o.infos))
+	for _, info := range o.infos {
+		if info.Score == score {
+			linfos = append(linfos, info)
+		}
+	}
+
+	numAvailableOrchs := len(linfos)
 	numOrchestrators = int(math.Min(float64(numAvailableOrchs), float64(numOrchestrators)))
 	ctx, cancel := context.WithTimeout(context.Background(), getOrchestratorsTimeoutLoop)
+	glog.Infof("```````` get orch %d , numAv %d", numOrchestrators, numAvailableOrchs)
 
 	infoCh := make(chan *net.OrchestratorInfo, numAvailableOrchs)
 	errCh := make(chan error, numAvailableOrchs)
@@ -104,8 +114,9 @@ func (o *orchestratorPool) GetOrchestrators(numOrchestrators int, suspender comm
 	// Shuffle into new slice to avoid mutating underlying data
 	uris := make([]*url.URL, numAvailableOrchs)
 	for i, j := range rand.Perm(numAvailableOrchs) {
-		uris[i] = o.infos[j].URL
+		uris[i] = linfos[j].URL
 	}
+	glog.Infof("```` trying %+v", uris)
 
 	for _, uri := range uris {
 		go getOrchInfo(uri)
@@ -142,9 +153,20 @@ func (o *orchestratorPool) GetOrchestrators(numOrchestrators int, suspender comm
 
 	glog.Infof("Done fetching orch info numOrch=%d responses=%d/%d timeout=%t",
 		len(infos), nbResp, len(uris), timeout)
+	glog.Infof("== infos %+v", infos)
 	return infos, nil
 }
 
 func (o *orchestratorPool) Size() int {
 	return len(o.infos)
+}
+
+func (o *orchestratorPool) SizeWithScore(score uint) int {
+	var size int
+	for _, info := range o.infos {
+		if info.Score == score {
+			size++
+		}
+	}
+	return size
 }

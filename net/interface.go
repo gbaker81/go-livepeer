@@ -21,6 +21,7 @@ type NodeStatus struct {
 	InternalManifests           map[string]string
 	StreamInfo                  map[string]StreamInfo
 	OrchestratorPool            []string
+	Scores                      []uint
 	Version                     string
 	GolangRuntimeVersion        string
 	GOArch                      string

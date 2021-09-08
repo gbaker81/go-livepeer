@@ -20,7 +20,7 @@ type CapabilityComparator interface {
 
 const (
 	Score_Untrusted = 0
-	Score_Trusted = 1
+	Score_Trusted   = 1
 )
 
 type OrchestratorLocalInfo struct {
@@ -30,8 +30,9 @@ type OrchestratorLocalInfo struct {
 
 type OrchestratorPool interface {
 	GetInfos() []OrchestratorLocalInfo
-	GetOrchestrators(int, Suspender, CapabilityComparator) ([]*net.OrchestratorInfo, error)
+	GetOrchestrators(int, Suspender, CapabilityComparator, uint) ([]*net.OrchestratorInfo, error)
 	Size() int
+	SizeWithScore(uint) int
 }
 
 type Suspender interface {

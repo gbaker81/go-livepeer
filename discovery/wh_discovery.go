@@ -94,7 +94,14 @@ func (w *webhookPool) Size() int {
 	return len(w.GetInfos())
 }
 
-func (w *webhookPool) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator) ([]*net.OrchestratorInfo, error) {
+func (w *webhookPool) SizeWithScore(score uint) int {
+	w.mu.RLock()
+	size := w.pool.SizeWithScore(score)
+	w.mu.RUnlock()
+	return size
+}
+
+func (w *webhookPool) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator, score uint) ([]*net.OrchestratorInfo, error) {
 	_, err := w.getInfos()
 	if err != nil {
 		return nil, err
@@ -103,7 +110,7 @@ func (w *webhookPool) GetOrchestrators(numOrchestrators int, suspender common.Su
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	return w.pool.GetOrchestrators(numOrchestrators, suspender, caps)
+	return w.pool.GetOrchestrators(numOrchestrators, suspender, caps, score)
 }
 
 var getURLsfromWebhook = func(cbUrl *url.URL) ([]byte, error) {

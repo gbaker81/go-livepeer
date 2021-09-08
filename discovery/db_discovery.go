@@ -94,7 +94,9 @@ func (dbo *DBOrchestratorPoolCache) GetInfos() []common.OrchestratorLocalInfo {
 	return infos
 }
 
-func (dbo *DBOrchestratorPoolCache) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator) ([]*net.OrchestratorInfo, error) {
+func (dbo *DBOrchestratorPoolCache) GetOrchestrators(numOrchestrators int, suspender common.Suspender, caps common.CapabilityComparator,
+	score uint) ([]*net.OrchestratorInfo, error) {
+
 	uris, err := dbo.getURLs()
 	if err != nil || len(uris) <= 0 {
 		return nil, err
@@ -137,7 +139,7 @@ func (dbo *DBOrchestratorPoolCache) GetOrchestrators(numOrchestrators int, suspe
 	}
 
 	orchPool := NewOrchestratorPoolWithPred(dbo.bcast, uris, pred, common.Score_Untrusted)
-	orchInfos, err := orchPool.GetOrchestrators(numOrchestrators, suspender, caps)
+	orchInfos, err := orchPool.GetOrchestrators(numOrchestrators, suspender, caps, score)
 	if err != nil || len(orchInfos) <= 0 {
 		return nil, err
 	}
@@ -153,6 +155,13 @@ func (dbo *DBOrchestratorPoolCache) Size() int {
 		},
 	)
 	return count
+}
+
+func (dbo *DBOrchestratorPoolCache) SizeWithScore(score uint) int {
+	if score == common.Score_Untrusted {
+		return dbo.Size()
+	}
+	return 0
 }
 
 func (dbo *DBOrchestratorPoolCache) cacheTranscoderPool() error {
