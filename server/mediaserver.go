@@ -64,6 +64,8 @@ var AuthWebhookURL *url.URL
 var DetectionWebhookURL *url.URL
 var DetectionWhClient = &http.Client{Timeout: 2 * time.Second}
 
+var SelectRandFreq float64
+
 // For HTTP push watchdog
 var httpPushTimeout = 1 * time.Minute
 var httpPushResetTimer = func() (context.Context, context.CancelFunc) {
@@ -577,7 +579,7 @@ func (s *LivepeerServer) registerConnection(rtmpStrm stream.RTMPVideoStream) (*r
 		pl:          playlist,
 		profile:     &vProfile,
 		params:      params,
-		sessManager: NewSessionManager(s.LivepeerNode, params, NewMinLSSelector(stakeRdr, 1.0)),
+		sessManager: NewSessionManager(s.LivepeerNode, params, NewMinLSSelectorWithRandFreq(stakeRdr, 1.0, SelectRandFreq)),
 		lastUsed:    time.Now(),
 	}
 
