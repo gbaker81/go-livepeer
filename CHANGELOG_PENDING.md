@@ -35,3 +35,5 @@
 - \#2018 Only mark tickets for failed transactions as redeemed when there is an error checking the transaction (@yondonfu)
 
 #### Transcoder
+
+- \#2027 Fix a memleak in the (experimental) AI content detection filter (@cyberj0g)
