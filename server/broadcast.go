@@ -173,6 +173,25 @@ func includesSession(sessions []*BroadcastSession, session *BroadcastSession) bo
 	return false
 }
 
+func includesSessionByOrch(sessions []*BroadcastSession, session *BroadcastSession) bool {
+	for _, sess := range sessions {
+		if sess.OrchestratorInfo.Transcoder == session.OrchestratorInfo.Transcoder {
+			return true
+		}
+	}
+	return false
+}
+
+func removeSessionFromList(sessions []*BroadcastSession, sess *BroadcastSession) []*BroadcastSession {
+	var res []*BroadcastSession
+	for _, ls := range sessions {
+		if ls != sess {
+			res = append(res, ls)
+		}
+	}
+	return res
+}
+
 func selectSession(sessions []*BroadcastSession, exclude []*BroadcastSession, durMult int) *BroadcastSession {
 	for _, session := range sessions {
 		if len(session.SegsInFlight) > 0 &&
@@ -206,6 +225,7 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 		var sess *BroadcastSession
 
 		// Re-use last session if oldest segment is in-flight for < segDur
+		gotFromLast := false
 		sess = selectSession(sp.lastSess, selectedSessions, 1)
 		if sess == nil {
 			// Or try a new session from the available ones
@@ -213,6 +233,7 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 			sess = sp.sel.Select()
 			glog.Infof("*** sel.Select returned %+v", sess)
 		} else {
+			gotFromLast = true
 			did := sp.sel.Remove(sess)
 			glog.Infof("*** used session from lastSess, removing (did=%v)", did)
 		}
@@ -224,6 +245,7 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 			// If no new sessions are available, re-use last session when oldest segment is in-flight for < 2 * segDur
 			sess = selectSession(sp.lastSess, selectedSessions, 2)
 			if sess != nil {
+				gotFromLast = true
 				glog.V(common.DEBUG).Infof("No sessions in the selector for manifestID=%v re-using orch=%v with acceptable in-flight time",
 					sp.mid, sp.lastSess[0].OrchestratorInfo.Transcoder)
 			}
@@ -237,8 +259,9 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 			// 	bsm.lastSess.SegsInFlight = nil
 			// 	bsm.lastSess = nil
 			// }
-			sp.lastSess = append([]*BroadcastSession{}, selectedSessions...)
-			return selectedSessions
+			// sp.lastSess = append([]*BroadcastSession{}, selectedSessions...)
+			// return selectedSessions
+			break
 		}
 
 		/*
@@ -266,8 +289,12 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 			selectedSessions = append(selectedSessions, sess)
 
 			if len(selectedSessions) == sessionsNum {
-				sp.lastSess = append([]*BroadcastSession{}, selectedSessions...)
-				return selectedSessions
+				break
+			}
+		} else {
+			if gotFromLast {
+				// remove from lastSess
+				sp.lastSess = removeSessionFromList(sp.lastSess, sess)
 			}
 		}
 
@@ -284,10 +311,15 @@ func (sp *SessionPool) selectSessions(sessionsNum int) []*BroadcastSession {
 			}
 		*/
 	}
-	// No session found, return nil
+	for _, ls := range sp.lastSess {
+		if !includesSessionByOrch(selectedSessions, ls) {
+			ls.SegsInFlight = nil
+		}
+	}
 	// if bsm.lastSess != nil
 	if len(selectedSessions) == 0 {
 		// bsm.lastSess.SegsInFlight = nil
+		// No session found, return nil
 		sp.lastSess = nil
 	} else {
 		sp.lastSess = append([]*BroadcastSession{}, selectedSessions...)
@@ -317,6 +349,13 @@ func (sp *SessionPool) completeSession(sess *BroadcastSession) {
 			sp.sessMap[sess.OrchestratorInfo.Transcoder] = sess
 		}
 		// todo fix this
+		for i, ls := range sp.lastSess {
+			if ls != sess && ls.OrchestratorInfo.Transcoder == sess.OrchestratorInfo.Transcoder {
+				sess.SegsInFlight = ls.SegsInFlight
+				sp.lastSess[i] = sess
+				break
+			}
+		}
 		/*
 			if sp.lastSess != nil && bsm.lastSess.OrchestratorInfo.Transcoder == sess.OrchestratorInfo.Transcoder && sess != bsm.lastSess {
 				sess.SegsInFlight = bsm.lastSess.SegsInFlight
@@ -329,9 +368,13 @@ func (sp *SessionPool) completeSession(sess *BroadcastSession) {
 			sess.SegsInFlight = sess.SegsInFlight[1:]
 			// skip returning this session back to the selector
 			// we will return it later in transcodeSegment() once all in-flight segs downloaded
+			glog.Infof("+++++++++++> not really returned session %s because has %d inflight %+v",
+				sess.OrchestratorInfo.Transcoder, len(sess.SegsInFlight), sess.SegsInFlight)
 			return
 		}
 		sp.sel.Complete(sess)
+	} else {
+		glog.Errorf("+++++++++++++++++++++> trying to complete unknown session %s", sess.OrchestratorInfo.Transcoder)
 	}
 }
 
@@ -415,6 +458,7 @@ func (bsm *BroadcastSessionsManager2) selectSessions() ([]*BroadcastSession, boo
 	defer bsm.sessLock.Unlock()
 
 	if bsm.VerificationFreq > 0 {
+
 		sessions := bsm.trustedPool.selectSessions(1)
 		untrustedSesions := bsm.untrustedPool.selectSessions(2)
 		calcPerceptualHash := len(sessions) > 0 && len(untrustedSesions) > 0
@@ -524,6 +568,8 @@ func (bsm *BroadcastSessionsManager2) chooseResults(submitResultsCh chan *Submit
 func (bsm *BroadcastSessionsManager2) completeSession(sess *BroadcastSession) {
 	bsm.sessLock.Lock()
 	defer bsm.sessLock.Unlock()
+	glog.Infof("===> XX completing session %s size now tru %d untru %d", sess.OrchestratorInfo.Transcoder,
+		bsm.trustedPool.sel.Size(), bsm.untrustedPool.sel.Size())
 
 	if sess.OrchestratorScore == common.Score_Untrusted {
 		bsm.untrustedPool.completeSession(sess)
@@ -532,6 +578,8 @@ func (bsm *BroadcastSessionsManager2) completeSession(sess *BroadcastSession) {
 	} else {
 		panic("shouldn't happen")
 	}
+	glog.Infof("===> XX completed session %s size now tru %d untru %d", sess.OrchestratorInfo.Transcoder,
+		bsm.trustedPool.sel.Size(), bsm.untrustedPool.sel.Size())
 }
 
 type BroadcastSessionsManager struct {

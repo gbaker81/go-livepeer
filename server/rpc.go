@@ -100,18 +100,19 @@ type BalanceUpdate struct {
 
 // BroadcastSession - session-specific state for broadcasters
 type BroadcastSession struct {
-	Broadcaster       common.Broadcaster
-	Params            *core.StreamParameters
-	OrchestratorInfo  *net.OrchestratorInfo
-	OrchestratorOS    drivers.OSSession
-	BroadcasterOS     drivers.OSSession
-	Sender            pm.Sender
-	PMSessionID       string
-	Balances          *core.AddressBalances
-	Balance           Balance
-	LatencyScore      float64
-	SegsInFlight      []SegFlightMetadata
-	OrchestratorScore uint
+	Broadcaster              common.Broadcaster
+	Params                   *core.StreamParameters
+	OrchestratorInfo         *net.OrchestratorInfo
+	OrchestratorOS           drivers.OSSession
+	BroadcasterOS            drivers.OSSession
+	Sender                   pm.Sender
+	PMSessionID              string
+	Balances                 *core.AddressBalances
+	Balance                  Balance
+	LatencyScore             float64
+	SegsInFlight             []SegFlightMetadata
+	OrchestratorScore        uint
+	VerifiedByPerceptualHash bool
 }
 
 // ReceivedTranscodeResult contains received transcode result data and related metadata
